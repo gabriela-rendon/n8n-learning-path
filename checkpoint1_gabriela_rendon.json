@@ -1,0 +1,474 @@
+{
+  "name": "Agente_consultas_facturacion_GR&B",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "responseNodes"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -496,
+        -512
+      ],
+      "id": "51bbe632-441a-461f-8947-29bf62044314",
+      "name": "When chat message received",
+      "webhookId": "0d9f56d1-030f-40e8-8244-fea9655b222c"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Instrucción del usuario: {{ $json.chatInput }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "#ROL\nEres un asistente interno de consulta especializado en la facturación de GR&B, una firma de abogados ficticia.\n\n#OBJETIVO\nRespondes las consultas de los usuarios internos de GR&B sobre la facturación acumulada durante el año 2026 del cliente consultado, utilizando la información disponible en la fuente de datos autorizada.\n\n#ÁMBITO\nPuedes consultar la facturación acumulada del cliente durante 2026, su razón social, número de identificación y socio facturador, con base en los registros disponibles en Google Sheets. La búsqueda puede realizarse mediante la razón social o el número de identificación del cliente. El ámbito se limita a información de facturación y no incluye cartera, pagos, saldos pendientes, cobranzas ni información de otros años.\n\n#TONO Y FORMATO DE SALIDA\nResponde en español claro, profesional y directo, sin giros de lenguaje inclusivo.\nDevuelve exclusivamente un objeto JSON válido. No incluyas encabezados, bloques Markdown ni texto antes o después del JSON.\nEl campo \"mensaje_usuario\" debe contener una respuesta breve, natural y comprensible para enviar por correo o WhatsApp. No debe superar los 500 caracteres.\nSi un dato no está disponible, utiliza null. No inventes información, no reemplaces datos ausentes con cero y no agregues campos diferentes de los definidos.\nLa salida debe cumplir exactamente con la estructura y los tipos definidos en el Structured Output Parser.\n\n#ESCALAMIENTO Y RESPUESTA\nEstablece el campo \"escalar\" en true cuando ocurra cualquiera de estas situaciones:\n  - El cliente solicitado no se encuentra en la fuente de datos.\n  - La pregunta solicita información institucional que no está disponible en los datos proporcionados.\n  - La información encontrada es insuficiente, ambigua o contradictoria.\n  - Se produce un error al consultar o procesar la fuente de datos.\n\nCuando \"escalar\" sea true:\n\n  - Indica brevemente en \"mensaje_usuario\" que no fue posible responder la consulta con la información disponible.\n  - Señala que el caso debe ser revisado por un supervisor de facturación.\n  - Utiliza null en los campos cuyos valores no puedan verificarse.\n  - No inventes, completes, estimes ni supongas información.\n  - No afirmes que la consulta o una herramienta se ejecutó correctamente si ocurrió un error.\n\nEstablece \"escalar\" en false únicamente cuando la información solicitada se encuentre en la fuente de datos y pueda responderse de forma completa y verificable.\n\n#USO DE TOOLS\nTienes acceso a una hoja de Google Sheets que contiene la información de facturación de GR&B correspondiente al año 2026.\nUtiliza esta herramienta únicamente para consultar información. La fuente es de solo lectura: no modifiques, elimines ni agregues registros.",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -128,
+        -512
+      ],
+      "id": "5e755885-a5dc-45b5-87bc-f5890a0210bb",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -208,
+        -288
+      ],
+      "id": "9f907174-ccb0-4f66-a8e1-0bb2530d3e39",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "ae8fa1e6-5dee-4aae-9135-03ee4b4050da",
+              "leftValue": "={{ $('AI Agent').item.json.output.escalar }}",
+              "rightValue": "=true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        512,
+        -512
+      ],
+      "id": "1fc9eafa-6c02-4104-a5ea-e5baf73f2f70",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"anio\": {\n      \"type\": \"integer\"\n    },\n    \"cliente\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"identificacion\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"socio_facturador\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"honorarios\": {\n      \"type\": [\"number\", \"null\"]\n    },\n    \"subtotal\": {\n      \"type\": [\"number\", \"null\"]\n    },\n    \"iva\": {\n      \"type\": [\"number\", \"null\"]\n    },\n    \"total\": {\n      \"type\": [\"number\", \"null\"]\n    },\n    \"moneda\": {\n      \"type\": \"string\"\n    },\n    \"mensaje_usuario\": {\n      \"type\": \"string\"\n    },\n    \"escalar\": {\n      \"type\": \"boolean\"\n    },\n    \"motivo_escalamiento\": {\n      \"type\": [\"string\", \"null\"]\n    }\n  },\n  \"required\": [\n    \"anio\",\n    \"cliente\",\n    \"identificacion\",\n    \"socio_facturador\",\n    \"honorarios\",\n    \"subtotal\",\n    \"iva\",\n    \"total\",\n    \"moneda\",\n    \"mensaje_usuario\",\n    \"escalar\",\n    \"motivo_escalamiento\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        112,
+        -304
+      ],
+      "id": "b7cc54e3-0615-492f-81b0-243989ea7a5b",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 500
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        -352,
+        -304
+      ],
+      "id": "9a979666-eb2e-46aa-ba86-d4b8d36329d3",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "cGXmyVjvaGSVHBG3",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1AFfp4ivQJ7VBXz9b37aL8IF_TyJRnUGOONSVnnBriOA",
+          "mode": "list",
+          "cachedResultName": "log_entrega_1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AFfp4ivQJ7VBXz9b37aL8IF_TyJRnUGOONSVnnBriOA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AFfp4ivQJ7VBXz9b37aL8IF_TyJRnUGOONSVnnBriOA/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $execution.id }}",
+            "fecha_hora": "={{ $now.toISO() }}",
+            "consulta_usuario": "={{ $('When chat message received').item.json.chatInput }}",
+            "cliente": "={{ $json.output.cliente }}",
+            "identificacion": "={{ $json.output.identificacion }}",
+            "total": "={{ $json.output.total }}",
+            "mensaje_usuario": "={{ $json.output.mensaje_usuario }}",
+            "escalar": "={{ $json.output.escalar }}",
+            "motivo_escalamiento": "={{ $json.output.motivo_escalamiento }}",
+            "estado_ejecucion": "={{ $('AI Agent').item.json.output.escalar? 'Escalada': 'Respondida' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_hora",
+              "displayName": "fecha_hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "consulta_usuario",
+              "displayName": "consulta_usuario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cliente",
+              "displayName": "cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "identificacion",
+              "displayName": "identificacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mensaje_usuario",
+              "displayName": "mensaje_usuario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "escalar",
+              "displayName": "escalar",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "motivo_escalamiento",
+              "displayName": "motivo_escalamiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado_ejecucion",
+              "displayName": "estado_ejecucion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        272,
+        -512
+      ],
+      "id": "35f73e1e-8d93-482d-8417-27e3c6711d96",
+      "name": "Registro_log",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "l4KnZf1TPcjzCDgh",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "message": "={{ $('AI Agent').item.json.output.mensaje_usuario }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.3,
+      "position": [
+        1056,
+        -336
+      ],
+      "id": "85b4e6c0-a446-49d3-86cd-790a9190a076",
+      "name": "Chat",
+      "webhookId": "48400698-2a08-4c5b-b747-6429b326a764"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0CGRL2DMGT",
+          "mode": "list",
+          "cachedResultName": "n8n-pruebas"
+        },
+        "text": "=Se ha escalado el siguiente mensaje: \nFecha: {{ $now }}\nConsulta del usuario: {{ $('When chat message received').item.json.chatInput }}\nMotivo del escalamiento: {{ $('AI Agent').item.json.output.motivo_escalamiento }}\n",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        800,
+        -560
+      ],
+      "id": "91248b89-4170-4018-8673-9e121a3db08f",
+      "name": "Send a message",
+      "webhookId": "fba2db10-3089-4abb-bc9b-2961696a916e",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "PkeCvEsBthpxnSux",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Utiliza esta herramienta cuando el usuario solicite información de facturación de un cliente de GR&B correspondiente al año 2026.\nActívala para buscar un cliente mediante su razón social o número de identificación y obtener los datos registrados de honorarios, subtotal, IVA, total y socio facturador.\nConsulta siempre esta herramienta antes de responder una pregunta sobre facturación. No respondas importes utilizando memoria, conocimiento previo o suposiciones.\nLa fuente es de solo lectura. No agregues, modifiques ni elimines registros.\nSi no encuentras una coincidencia, los datos son ambiguos o la herramienta devuelve un error, no inventes información y activa el escalamiento.",
+        "documentId": {
+          "__rl": true,
+          "value": "1ty6qAKvwVE7Ro9Jk6JVIa-TXnS7XQECBvBpN9GtN2zo",
+          "mode": "list",
+          "cachedResultName": "Facturacion_clientes_2026",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ty6qAKvwVE7Ro9Jk6JVIa-TXnS7XQECBvBpN9GtN2zo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "facturacion_2026",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ty6qAKvwVE7Ro9Jk6JVIa-TXnS7XQECBvBpN9GtN2zo/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -48,
+        -304
+      ],
+      "id": "daf63f54-b0ae-4fd5-8716-d8137ac3e723",
+      "name": "Base de Datos Clientes Facturación 2026",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "l4KnZf1TPcjzCDgh",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Registro_log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registro_log": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base de Datos Clientes Facturación 2026": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "9c7c2e55-547a-45ca-bb21-fe1facac8d6f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9585cebaf52a419918c597e347af496fe93d8386fb02616a4cc3bf195b032945"
+  },
+  "nodeGroups": [],
+  "id": "H5lmEPj0HYq00Z0E",
+  "tags": []
+}
